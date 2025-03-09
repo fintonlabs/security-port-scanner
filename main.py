@@ -1,93 +1,96 @@
-import os
 import socket
+import os
+import sys
 import json
-import concurrent.futures
+import csv
+import datetime
+from typing import Dict, List, Any
 
 class PortScanner:
     """
-    A class used to represent a Port Scanner
-
-    ...
-
-    Attributes
-    ----------
-    ip_range : str
-        a string representing the range of IP addresses to scan
-    results : dict
-        a dictionary to store the results of the scan
-
-    Methods
-    -------
-    scan_ports(ip_address):
-        Scans all ports for a given IP address and stores the results in the results dictionary.
-    scan():
-        Initiates the port scan for all IP addresses in the ip_range.
-    get_results():
-        Returns the results of the scan in a structured JSON format.
+    A lightweight port scanning tool that identifies open ports and potential vulnerabilities across a network.
     """
 
-    def __init__(self, ip_range: str):
+    def __init__(self, host: str):
+        self.host = host
+        self.open_ports = []
+        self.vulnerabilities = []
+
+    def scan_ports(self, start_port: int, end_port: int) -> None:
         """
-        Constructs all the necessary attributes for the Port Scanner object.
-
-        Parameters
-        ----------
-            ip_range : str
-                a string representing the range of IP addresses to scan
+        Scan the ports in the given range and identify the open ones.
         """
+        for port in range(start_port, end_port + 1):
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            result = sock.connect_ex((self.host, port))
+            if result == 0:
+                self.open_ports.append(port)
+            sock.close()
 
-        self.ip_range = ip_range
-        self.results = {}
-
-    def scan_ports(self, ip_address: str):
+    def detect_vulnerabilities(self) -> None:
         """
-        Scans all ports for a given IP address and stores the results in the results dictionary.
-
-        Parameters
-        ----------
-            ip_address : str
-                a string representing the IP address to scan
+        Detect potential vulnerabilities. This is a placeholder method as actual vulnerability detection would require
+        a database of known vulnerabilities which is beyond the scope of this task.
         """
+        for port in self.open_ports:
+            self.vulnerabilities.append({
+                'port': port,
+                'vulnerability_id': 'VULN001',
+                'description': 'Example vulnerability',
+                'severity': 'High',
+                'remediation': 'Update to the latest version'
+            })
 
-        self.results[ip_address] = {}
-
-        for port in range(0, 65536):
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(1)
-                result = sock.connect_ex((ip_address, port))
-                if result == 0:
-                    self.results[ip_address][port] = 'Open'
-                else:
-                    self.results[ip_address][port] = 'Closed'
-                sock.close()
-            except Exception as e:
-                self.results[ip_address][port] = 'Error: ' + str(e)
-
-    def scan(self):
+    def generate_report(self, format: str) -> Dict[str, Any]:
         """
-        Initiates the port scan for all IP addresses in the ip_range.
+        Generate a report of the scan in the specified format (JSON or CSV).
         """
+        scan_info = {
+            'host': self.host,
+            'scan_date': str(datetime.datetime.now()),
+            'scan_type': 'Port and Vulnerability Scan'
+        }
 
-        ip_addresses = self.ip_range.split('-')
+        port_info = [{'port': port, 'state': 'open'} for port in self.open_ports]
 
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.map(self.scan_ports, ip_addresses)
+        report = {
+            'scan_info': scan_info,
+            'port_info': port_info,
+            'vulnerabilities': self.vulnerabilities
+        }
 
-    def get_results(self) -> str:
+        if format.lower() == 'json':
+            with open('report.json', 'w') as f:
+                json.dump(report, f, indent=4)
+        elif format.lower() == 'csv':
+            with open('report.csv', 'w') as f:
+                writer = csv.writer(f)
+                writer.writerow(['Scan Information', ''])
+                for key, value in scan_info.items():
+                    writer.writerow([key, value])
+                writer.writerow(['Port Information', ''])
+                for info in port_info:
+                    writer.writerow([info['port'], info['state']])
+                writer.writerow(['Vulnerability Information', ''])
+                for vuln in self.vulnerabilities:
+                    writer.writerow([vuln['port'], vuln['vulnerability_id'], vuln['description'], vuln['severity'], vuln['remediation']])
+        else:
+            raise ValueError('Invalid format. Please choose either "json" or "csv".')
+
+        return report
+
+    def run(self, start_port: int, end_port: int, format: str) -> Dict[str, Any]:
         """
-        Returns the results of the scan in a structured JSON format.
-
-        Returns
-        -------
-        str
-            a string representing the results of the scan in a structured JSON format
+        Run the port scanner.
         """
-
-        return json.dumps(self.results, indent=4)
+        self.scan_ports(start_port, end_port)
+        self.detect_vulnerabilities()
+        return self.generate_report(format)
 
 
 # Example usage
-scanner = PortScanner('192.168.1.1-192.168.1.5')
-scanner.scan()
-print(scanner.get_results())
+if __name__ == "__main__":
+    scanner = PortScanner('localhost')
+    report = scanner.run(70, 90, 'json')
+    print(json.dumps(report, indent=4))
